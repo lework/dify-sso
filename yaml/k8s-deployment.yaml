@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dify-sso
+  labels:
+    app.kubernetes.io/name: dify-sso
+data:
+  # 服务配置
+  CONSOLE_WEB_URL: 'https://test-dify.test.com'
+  SECRET_KEY: 'sk-123456'
+  TENANT_ID: 'f9ea64ca-2acf-44a7-aca0-123456'
+  EDITION: 'SELF_HOSTED'
+  ACCESS_TOKEN_EXPIRE_MINUTES: '300'
+  REFRESH_TOKEN_EXPIRE_DAYS: '30'
+  REFRESH_TOKEN_PREFIX: 'refresh_token:'
+  ACCOUNT_REFRESH_TOKEN_PREFIX: 'account_refresh_token:'
+
+  # OIDC配置
+  OIDC_ENABLED: 'true'
+  OIDC_CLIENT_ID: '123456'
+  OIDC_CLIENT_SECRET: '123456'
+  OIDC_DISCOVERY_URL: 'https://test-dify.sso.test.com/oidc/.well-known/openid-configuration'
+  OIDC_REDIRECT_URI: 'https://test-dify.test.com/console/api/enterprise/sso/oidc/callback'
+  OIDC_SCOPE: 'openid profile email'
+  OIDC_RESPONSE_TYPE: 'code'
+
+  # 数据库配置
+  DB_HOST: '127.0.0.1'
+  DB_PORT: '5432'
+  DB_DATABASE: 'dify'
+  DB_PASSWORD: '123456'
+  DB_USERNAME: 'dify_admin'
+
+  # Redis 配置
+  REDIS_DB: '13'
+  REDIS_HOST: '127.0.0.1'
+  REDIS_PORT: '6379'
+  REDIS_PASSWORD: '123456'
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dify-sso
+  labels:
+    app.kubernetes.io/name: dify-sso
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dify-sso
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dify-sso
+    spec:
+      containers:
+        - name: dify-sso
+          image: lework/dify-sso
+          ports:
+            - name: api
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: dify-sso
+          resources:
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - 'sleep 10'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: api
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: api
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 5
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 90
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+      enableServiceLinks: false
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 600
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dify-sso
+  labels:
+    app.kubernetes.io/name: dify-sso
+spec:
+  ports:
+    - name: http-api
+      protocol: TCP
+      port: 8000
+      targetPort: api
+  selector:
+    app.kubernetes.io/name: dify-sso
+  type: ClusterIP
+  sessionAffinity: None
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  internalTrafficPolicy: Cluster

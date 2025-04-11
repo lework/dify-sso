@@ -1,0 +1,34 @@
+services:
+  dify-sso:
+    image: lework/dify-sso
+    container_name: dify-sso
+    restart: always
+    environment:
+      # 服务配置
+      CONSOLE_WEB_URL: 'https://test-dify.test.com'
+      SECRET_KEY: 'sk-123456'
+      TENANT_ID: 'f9ea64ca-2a cf-44a7-aca0-123456'
+      EDITION: 'SELF_HOSTED'
+      ACCESS_TOKEN_EXPIRE_MINUTES: '300'
+      REFRESH_TOKEN_EXPIRE_DAYS: '30'
+      REFRESH_TOKEN_PREFIX: 'refresh_token:'
+      ACCOUNT_REFRESH_TOKEN_PREFIX: 'account_refresh_token:'
+      # OIDC配置
+      OIDC_ENABLED: 'true'
+      OIDC_CLIENT_ID: '123456'
+      OIDC_CLIENT_SECRET: '123456'
+      OIDC_DISCOVERY_URL: 'https://test-dify.sso.test.com/oidc/.well-known/openid-configuration'
+      OIDC_REDIRECT_URI: 'https://test-dify.test.com/console/api/enterprise/sso/oidc/callback'
+      OIDC_SCOPE: 'openid profile email'
+      OIDC_RESPONSE_TYPE: 'code'
+      # 数据库配置
+      DB_HOST: '127.0.0.1'
+      DB_PORT: '5432'
+      DB_DATABASE: 'dify'
+      DB_PASSWORD: '123456'
+      DB_USERNAME: 'dify_admin'
+      # Redis 配置
+      REDIS_DB: '13'
+      REDIS_HOST: '127.0.0.1'
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: '123456'

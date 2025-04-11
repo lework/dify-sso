@@ -1,0 +1,12 @@
+psycopg2==2.9.10
+redis==5.2.1
+requests==2.32.3
+SQLAlchemy==2.0.39
+fastapi==0.115.12
+uvicorn==0.34.0
+PyJWT==2.10.1
+python-dotenv==1.0.1
+Flask==3.1.0
+Flask-Login==0.6.3
+Flask-SQLAlchemy==3.1.1
+pydantic-settings==2.8.1
