@@ -9,6 +9,7 @@ services:
       SECRET_KEY: 'sk-123456'
       TENANT_ID: 'f9ea64ca-2a cf-44a7-aca0-123456'
       EDITION: 'SELF_HOSTED'
+      ACCOUNT_DEFAULT_ROLE: 'normal'
       ACCESS_TOKEN_EXPIRE_MINUTES: '300'
       REFRESH_TOKEN_EXPIRE_DAYS: '30'
       REFRESH_TOKEN_PREFIX: 'refresh_token:'

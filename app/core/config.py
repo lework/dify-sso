@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 class Settings(BaseSettings):
     # 通用配置
@@ -7,6 +6,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key"
     TENANT_ID: str = ""
     EDITION: str = "SELF_HOSTED"
+    ACCOUNT_DEFAULT_ROLE: str = "normal"
     
     # 刷新令牌配置
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     OIDC_CLIENT_SECRET: str = ""
     OIDC_DISCOVERY_URL: str = ""
     OIDC_REDIRECT_URI: str = ""
-    OIDC_SCOPE: str = "openid profile email"
+    OIDC_SCOPE: str = "openid profile email roles"
     OIDC_RESPONSE_TYPE: str = "code"
     
     # 数据库配置
@@ -40,4 +40,4 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = True
 
-settings = Settings() 
+settings = Settings()

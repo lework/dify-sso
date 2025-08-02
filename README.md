@@ -60,6 +60,7 @@ CONSOLE_WEB_URL=your-dify-web-address  # dify 的 web 地址
 SECRET_KEY=your-secret-key  # dify 的 secret key
 TENANT_ID=your-tenant-id  # dify 的 tenant id
 EDITION=SELF_HOSTED
+ACCOUNT_DEFAULT_ROLE=normal  # 默认用户角色，可选值: normal, editor, admin
 
 # 令牌配置
 ACCESS_TOKEN_EXPIRE_MINUTES=600
