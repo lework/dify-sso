@@ -1,7 +1,7 @@
-from fastapi import APIRouter
+from flask import request
 from datetime import datetime, timedelta
 
-router = APIRouter()
+from app.api.router import api
 
 # 模拟企业信息
 MOCK_ENTERPRISE_INFO = {
@@ -79,12 +79,14 @@ SYSTEM_FEATURES = {
 }
 
 
-@router.get("/info")
-async def get_enterprise_info():
+@api.get("/info")
+def get_enterprise_info():
     return MOCK_ENTERPRISE_INFO
 
-@router.get("/app-sso-setting")
-async def get_app_sso_setting(app_code: str):
+@api.get("/app-sso-setting")
+def get_app_sso_setting():
+    app_code = request.args.get("app_code", "")
+
     return {
         "enabled": True,
         "protocol": "oidc",
@@ -92,12 +94,12 @@ async def get_app_sso_setting(app_code: str):
     } 
 
 # 计费相关接口
-@router.get("/subscription/info")
-async def get_billing_info():
+@api.get("/subscription/info")
+def get_billing_info():
     return MOCK_BILLING_INFO
 
 
 # 系统功能
-@router.get("/console/api/system-features")
-async def get_system_features():
+@api.get("/console/api/system-features")
+def get_system_features():
     return SYSTEM_FEATURES

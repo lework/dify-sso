@@ -26,4 +26,4 @@ RUN --mount=type=cache,id=pip,target=/root/.cache \
 # 拷贝代码
 COPY . .
 
-CMD ["python", "-m", "app.main"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8000", "app.main:app"]

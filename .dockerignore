@@ -88,3 +88,5 @@ venv/
 
 # VS Code
 .vscode/
+
+yaml/

@@ -1,10 +1,10 @@
 import enum
 import json
+from typing import Optional
 from datetime import UTC, datetime
 from flask_login import UserMixin
 from sqlalchemy import DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
-from typing import Optional
 
 from .base import Base
 from .engine import db
@@ -186,12 +186,12 @@ class Account(UserMixin, Base):
         return self._current_tenant.current_role == TenantAccountRole.DATASET_OPERATOR
 
     @classmethod
-    def get_by_email(cls, db, email: str):
+    def get_by_email(cls, email: str):
         """通过邮箱查找用户"""
-        return db.query(cls).filter(cls.email == email).first()
+        return db.session.query(cls).filter(cls.email == email).first()
 
     @classmethod
-    def create(cls, db, email: str, name: str, avatar: str = None, tenant_id: str = None):
+    def create(cls, email: str, name: str, avatar: str = None):
         """创建新用户"""
         account = cls(
             email=email,
@@ -203,19 +203,8 @@ class Account(UserMixin, Base):
             status=AccountStatus.ACTIVE,
             initialized_at=datetime.now(UTC),
         )
-        db.add(account)
-        db.flush()  # 获取account.id
-
-        # 如果提供了tenant_id，创建租户关联
-        if tenant_id:
-            tenant_account_join = TenantAccountJoin(
-                tenant_id=tenant_id,
-                account_id=account.id,
-                role=TenantAccountRole.EDITOR
-            )
-            db.add(tenant_account_join)
-
-        db.commit()
+        db.session.add(account)
+        db.session.commit()
         return account
 
 
@@ -224,7 +213,7 @@ class TenantStatus(enum.StrEnum):
     ARCHIVE = "archive"
 
 
-class Tenant(db.Model):  # type: ignore[name-defined]
+class Tenant(db.Model):
     __tablename__ = "tenants"
     __table_args__ = (db.PrimaryKeyConstraint("id", name="tenant_pkey"),)
 
@@ -253,7 +242,7 @@ class Tenant(db.Model):  # type: ignore[name-defined]
         self.custom_config = json.dumps(value)
 
 
-class TenantAccountJoin(db.Model):  # type: ignore[name-defined]
+class TenantAccountJoin(db.Model): 
     __tablename__ = "tenant_account_joins"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="tenant_account_join_pkey"),
@@ -272,63 +261,17 @@ class TenantAccountJoin(db.Model):  # type: ignore[name-defined]
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.current_timestamp())
 
     @classmethod
-    def get_by_account(cls, db_session, tenant_id: str, account_id: str):
+    def create(cls, tenant_id: str, account_id: str, role: str):
+        tenant_account_join = cls(
+            tenant_id=tenant_id,
+            account_id=account_id,
+            role=role
+        )
+        db.session.add(tenant_account_join)
+        db.session.commit()
+        return tenant_account_join
+
+    @classmethod
+    def get_by_account(cls, tenant_id: str, account_id: str):
         """通过账号查找用户"""
-        return db_session.query(cls).filter(cls.tenant_id == tenant_id, cls.account_id == account_id).first()
-
-class AccountIntegrate(db.Model):  # type: ignore[name-defined]
-    __tablename__ = "account_integrates"
-    __table_args__ = (
-        db.PrimaryKeyConstraint("id", name="account_integrate_pkey"),
-        db.UniqueConstraint("account_id", "provider", name="unique_account_provider"),
-        db.UniqueConstraint("provider", "open_id", name="unique_provider_open_id"),
-    )
-
-    id: Mapped[str] = mapped_column(StringUUID, server_default=db.text("uuid_generate_v4()"))
-    account_id: Mapped[str] = mapped_column(StringUUID)
-    provider: Mapped[str] = mapped_column(String(16))
-    open_id: Mapped[str] = mapped_column(String(255))
-    encrypted_token: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.current_timestamp())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.current_timestamp())
-
-
-class InvitationCode(db.Model):  # type: ignore[name-defined]
-    __tablename__ = "invitation_codes"
-    __table_args__ = (
-        db.PrimaryKeyConstraint("id", name="invitation_code_pkey"),
-        db.Index("invitation_codes_batch_idx", "batch"),
-        db.Index("invitation_codes_code_idx", "code", "status"),
-    )
-
-    id: Mapped[int] = mapped_column(db.Integer)
-    batch: Mapped[str] = mapped_column(String(255))
-    code: Mapped[str] = mapped_column(String(32))
-    status: Mapped[str] = mapped_column(String(16), server_default=db.text("'unused'::character varying"))
-    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    used_by_tenant_id: Mapped[Optional[str]] = mapped_column(StringUUID)
-    used_by_account_id: Mapped[Optional[str]] = mapped_column(StringUUID)
-    deprecated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=db.text("CURRENT_TIMESTAMP(0)"))
-
-class TenantPluginPermission(Base):
-    class InstallPermission(enum.StrEnum):
-        EVERYONE = "everyone"
-        ADMINS = "admins"
-        NOBODY = "noone"
-
-    class DebugPermission(enum.StrEnum):
-        EVERYONE = "everyone"
-        ADMINS = "admins"
-        NOBODY = "noone"
-
-    __tablename__ = "account_plugin_permissions"
-    __table_args__ = (
-        db.PrimaryKeyConstraint("id", name="account_plugin_permission_pkey"),
-        db.UniqueConstraint("tenant_id", name="unique_tenant_plugin"),
-    )
-
-    id: Mapped[str] = mapped_column(StringUUID, server_default=db.text("uuid_generate_v4()"))
-    tenant_id: Mapped[str] = mapped_column(StringUUID, nullable=False)
-    install_permission: Mapped[InstallPermission] = mapped_column(String(16), nullable=False, server_default="everyone")
-    debug_permission: Mapped[DebugPermission] = mapped_column(String(16), nullable=False, server_default="noone")
+        return db.session.query(cls).filter(cls.tenant_id == tenant_id, cls.account_id == account_id).first()

@@ -5,18 +5,19 @@
 ## 功能特性
 
 - OIDC 登录集成
-- 配置灵活，通过环境变量控制
-- 支持授权码流程
 - 支持用户数据库自动创建和关联
+- 支持用户角色自动更新
 
 ## 技术栈
 
 - Python 3.8+
-- FastAPI
+- Flask
 - SQLAlchemy
-- PostgreSQL
+- PostgreSQL  
 - Redis
 - Flask-Login
+- Pydantic Settings
+- PyJWT
 
 ## 系统要求
 
@@ -29,41 +30,57 @@
 
 ```
 dify-sso/
-├── app/                      # 主应用代码
-│   ├── api/                  # API 路由和端点
-│   ├── core/                 # 核心配置和功能
-│   ├── db/                   # 数据库模型和迁移
-│   ├── models/               # 数据模型
-│   ├── services/             # 业务逻辑服务
-│   ├── utils/                # 工具函数
-│   ├── __init__.py           # 包初始化文件
-│   └── main.py               # 应用入口文件
-├── assets/                   # 静态资源和图片
-├── yaml/                     # 部署配置文件
-│   ├── docker-compose.yaml   # Docker Compose 配置
-│   └── k8s-deployment.yaml   # Kubernetes 部署配置
-├── .env.example              # 环境变量示例
-├── .env                      # 环境变量配置
-├── .dockerignore             # Docker 忽略文件
-├── .gitignore                # Git 忽略文件
-├── requirements.txt          # 项目依赖
-└── Dockerfile                # Docker 构建文件
+├── app/                        # 主应用代码
+│   ├── api/                    # API 路由和端点
+│   │   ├── dify/               # Dify 相关 API 端点实现
+│   │   └── router.py           # 路由配置
+│   ├── configs/                # 配置模块（模块化配置系统）
+│   │   ├── __init__.py         # 配置统一入口
+│   │   ├── app_config.py       # 应用基础配置
+│   │   ├── database_config.py  # 数据库配置
+│   │   ├── redis_config.py     # Redis 配置
+│   │   ├── logger_config.py    # 日志配置
+│   │   └── sso_config.py       # SSO 配置
+│   ├── extensions/             # 扩展模块（插件化初始化）
+│   │   ├── __init__.py         # 扩展模块入口
+│   │   ├── ext_database.py     # 数据库扩展
+│   │   ├── ext_redis.py        # Redis 扩展
+│   │   ├── ext_logging.py      # 日志扩展
+│   │   ├── ext_oidc.py         # OIDC 扩展
+│   │   ├── ext_timezone.py     # 时区扩展
+│   │   └── ext_blueprints.py   # 蓝图注册扩展
+│   ├── models/                 # 数据模型
+│   ├── services/               # 业务逻辑服务
+│   ├── app.py                  # Flask 应用工厂
+│   ├── __init__.py             # 包初始化文件
+│   └── main.py                 # 应用入口文件
+├── assets/                     # 静态资源和图片
+├── yaml/                       # 部署配置文件
+│   ├── docker-compose.yaml     # Docker Compose 配置
+│   └── k8s-deployment.yaml     # Kubernetes 部署配置
+├── .env.example                # 环境变量示例
+├── .dockerignore               # Docker 忽略文件
+├── .gitignore                  # Git 忽略文件
+├── requirements.txt            # 项目依赖
+└── Dockerfile                  # Docker 构建文件
 ```
 
 ## 配置说明
+
+项目采用模块化配置系统，所有配置通过 Pydantic Settings 进行管理，支持环境变量和 `.env` 文件配置。
 
 OIDC SSO 集成需要以下环境变量配置：
 
 ```bash
 # Dify 配置
 CONSOLE_WEB_URL=your-dify-web-address  # dify 的 web 地址
-SECRET_KEY=your-secret-key  # dify 的 secret key
-TENANT_ID=your-tenant-id  # dify 的 tenant id
+SECRET_KEY=dify-secret-key  # dify 的 secret key
+TENANT_ID=dify-tenant-id  # dify 的 tenant id
 EDITION=SELF_HOSTED
-ACCOUNT_DEFAULT_ROLE=normal  # 默认用户角色，可选值: normal, editor, admin
+ACCOUNT_DEFAULT_ROLE=editor  # 默认用户角色，可选值: normal, editor, admin
 
 # 令牌配置
-ACCESS_TOKEN_EXPIRE_MINUTES=600
+ACCESS_TOKEN_EXPIRE_MINUTES=900
 REFRESH_TOKEN_EXPIRE_DAYS=30
 REFRESH_TOKEN_PREFIX=refresh_token:
 ACCOUNT_REFRESH_TOKEN_PREFIX=account_refresh_token:
@@ -73,8 +90,8 @@ OIDC_ENABLED=true  # 是否启用OIDC
 OIDC_CLIENT_ID=your-client-id  # OIDC客户端ID
 OIDC_CLIENT_SECRET=your-client-secret  # OIDC客户端密钥
 OIDC_DISCOVERY_URL=https://your-oidc-provider/.well-known/openid-configuration  # OIDC发现端点
-OIDC_REDIRECT_URI=http://localhost:8000/enterprise/sso/oidc/callback  # 回调URI
-OIDC_SCOPE=openid profile email  # 请求的范围
+OIDC_REDIRECT_URI=http://localhost:8000/console/api/enterprise/sso/oidc/callback  # 回调URL
+OIDC_SCOPE=openid profile email roles  # 请求的范围
 OIDC_RESPONSE_TYPE=code  # 响应类型
 
 # 数据库配置
@@ -149,10 +166,12 @@ python -m app.main
 
 ![image-20250408142818633](./assets/image-20250408142818633.png)
 
+> 在SSO服务商中配置 scope roles 后，便可在用户登录时分配相应角色。系统默认角色为 normal，如需设置其他角色，请在 .env 文件中将 ACCOUNT_DEFAULT_ROLE 配置为所需的角色。
+
 2. 启动 dify-sso 容器
 
 ```bash
-docker run -p 8000:8000 --env-file .env lework/dify-sso:0.0.1
+docker run -p 8000:8000 --env-file .env lework/dify-sso
 ```
 
 3. 在 dify-proxy 的 nginx 配置文件中添加以下配置：
@@ -177,8 +196,7 @@ OIDC SSO 集成提供以下 API 端点：
 - **GET /console/api/enterprise/sso/oidc/login**: 启动 OIDC 登录流程，将用户重定向到 OIDC 提供商
 - **GET /console/api/enterprise/sso/oidc/callback**: OIDC 回调处理，处理授权码并获取用户信息
 - **GET /console/api/system-features**: 获取系统功能配置
-- **GET /health**: 健康检查端点
-- **GET /info**: 获取企业信息
+- **GET /console/api/enterprise/info**: 获取企业信息
 
 ## OIDC 认证流程
 
@@ -191,7 +209,7 @@ OIDC 登录流程遵循标准的授权码流程（Authorization Code Flow）：
 5. 系统使用授权码获取访问令牌和 ID 令牌
 6. 系统使用访问令牌获取用户信息
 7. 系统通过 OIDC 用户信息中的 `sub` 或 `email` 查询数据库，确认用户是否存在：
-   - 如果用户存在，更新其信息（如姓名）并记录登录时间和 IP
+   - 如果用户存在，更新其信息（如姓名）并记录登录时间和 IP，当用户角色与 SSO 服务商配置的角色不一致，则更新用户角色
    - 如果用户不存在，创建新用户并关联到默认租户
 8. 系统生成 JWT 令牌和刷新令牌，并将用户重定向到 Dify 控制台
 
