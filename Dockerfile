@@ -4,6 +4,7 @@ FROM python:3.11-alpine AS running
 ENV LANG='en_US.UTF-8' \
     LANGUAGE='en_US.UTF-8' \
     TZ='Asia/Shanghai' \
+    GUNICORN_WORKERS=2 \
     PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 RUN \
@@ -26,4 +27,4 @@ RUN --mount=type=cache,id=pip,target=/root/.cache \
 # 拷贝代码
 COPY . .
 
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8000", "app.main:app"]
+CMD ["bash", "-c", "exec gunicorn -w ${GUNICORN_WORKERS} -b 0.0.0.0:8000 app.main:app"]

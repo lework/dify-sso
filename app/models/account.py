@@ -275,3 +275,19 @@ class TenantAccountJoin(db.Model):
     def get_by_account(cls, tenant_id: str, account_id: str):
         """通过账号查找用户"""
         return db.session.query(cls).filter(cls.tenant_id == tenant_id, cls.account_id == account_id).first()
+
+class AccountIntegrate(Base):
+    __tablename__ = "account_integrates"
+    __table_args__ = (
+        db.PrimaryKeyConstraint("id", name="account_integrate_pkey"),
+        db.UniqueConstraint("account_id", "provider", name="unique_account_provider"),
+        db.UniqueConstraint("provider", "open_id", name="unique_provider_open_id"),
+    )
+
+    id: Mapped[str] = mapped_column(StringUUID, server_default=db.text("uuid_generate_v4()"))
+    account_id: Mapped[str] = mapped_column(StringUUID)
+    provider: Mapped[str] = mapped_column(String(16))
+    open_id: Mapped[str] = mapped_column(String(255))
+    encrypted_token: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.current_timestamp())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.current_timestamp())

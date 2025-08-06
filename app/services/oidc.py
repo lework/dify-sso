@@ -1,7 +1,7 @@
 import logging
 import requests
 from typing import Dict
-from urllib.parse import urlencode
+from urllib.parse import urlencode,unquote
 from datetime import UTC, datetime, timedelta
 
 from app.configs import config
@@ -46,7 +46,7 @@ class OIDCService:
             return False
         return True
 
-    def get_login_url(self) -> str:
+    def get_login_url(self, redirect_uri_params: str = "") -> str:
         # 生成登录URL
         params = {
             'client_id': self.client_id,
@@ -55,9 +55,14 @@ class OIDCService:
             'redirect_uri': self.redirect_uri,
             'state': 'random_state'
         }
+
+        if redirect_uri_params:
+            # 拼接查询参数的时候，需要先使用urldecode解码，然后使用urlencode编码
+            params['redirect_uri'] = self.redirect_uri + "?" + unquote(redirect_uri_params)
+
         return f"{self.authorization_endpoint}?{urlencode(params)}"
 
-    def get_token(self, code: str) -> Dict:
+    def get_token(self, code: str, redirect_uri_params: str = "") -> Dict:
         # 获取访问令牌
         data = {
             'grant_type': 'authorization_code',
@@ -66,6 +71,10 @@ class OIDCService:
             'client_id': self.client_id,
             'client_secret': self.client_secret
         }
+
+        if redirect_uri_params:
+            data['redirect_uri'] = self.redirect_uri + "?" + unquote(redirect_uri_params)
+
         response = requests.post(self.token_endpoint, data=data)
         if response.status_code != 200:
             logger.exception("获取token失败: status_code=%d, response=%s", 
@@ -83,11 +92,11 @@ class OIDCService:
             raise Exception("Failed to get user info")
         return response.json()
 
-    def handle_callback(self, code: str, client_host: str) -> Dict[str, str]:
+    def handle_callback(self, code: str, client_host: str, redirect_uri_params: str = "") -> Dict[str, str]:
         # 处理回调，返回access token和refresh token
         try:
             # 获取访问令牌
-            token_response = self.get_token(code)
+            token_response = self.get_token(code, redirect_uri_params)
             access_token = token_response.get('access_token')
             
             # 获取用户信息
@@ -157,24 +166,42 @@ class OIDCService:
             exp_dt = datetime.now(UTC) + timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES)
             exp = int(exp_dt.timestamp())
             account_id = str(account.id)
-            payload = {
-                "user_id": account_id,  # 将UUID转换为字符串
-                "exp": exp,
-                "iss": config.EDITION,
-                "sub": "Console API Passport",
-            }
 
-            # 生成access token
-            console_access_token: str = self.passport_service.issue(payload)
+            if redirect_uri_params:
+                payload = {
+                    "user_id": account_id,  # 将UUID转换为字符串
+                    "session_id": account.email,
+                    "auth_type": "internal",
+                    "token_source": "webapp_login_token",
+                    "exp": exp,
+                    "sub": "Web API Passport",
+                }
 
-            # 生成并存储refresh token
-            refresh_token = self.token_service.generate_refresh_token()
-            self.token_service.store_refresh_token(refresh_token, account_id)
+                access_token = self.passport_service.issue(payload)
 
-            return {
-                "access_token": console_access_token,
-                "refresh_token": refresh_token,
-            }
+                return {
+                    "access_token": access_token,
+                }
+
+            else:
+              payload = {
+                  "user_id": account_id,  # 将UUID转换为字符串
+                  "exp": exp,
+                  "iss": config.EDITION,
+                  "sub": "Console API Passport",
+              }
+
+              # 生成access token
+              console_access_token: str = self.passport_service.issue(payload)
+
+              # 生成并存储refresh token
+              refresh_token = self.token_service.generate_refresh_token()
+              self.token_service.store_refresh_token(refresh_token, account_id)
+
+              return {
+                  "access_token": console_access_token,
+                  "refresh_token": refresh_token,
+              }
         
         except Exception as e:
             logger.exception("处理OIDC回调时发生错误: %s", str(e))

@@ -54,4 +54,4 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 # 导入endpoints
-from .dify import sso, enterprise
+from .dify import sso, enterprise, webapp
