@@ -40,9 +40,10 @@ def oidc_callback():
         logger.exception("OIDC回调处理失败: %s", str(e))
         return {"error": str(e)}, 400
 
+@api.get("/api/enterprise/sso/oidc/login")
 @api.get("/api/enterprise/sso/members/oidc/login")
 def oidc_login_callback():
     app_code = request.args.get("app_code", "")
     redirect_url = request.args.get("redirect_url", "")
     login_url = oidc_service.get_login_url(f"app_code={app_code}&redirect_url={redirect_url}")
-    return redirect(login_url)
+    return {"url": login_url}
