@@ -29,6 +29,7 @@ class OIDCService:
         self._load_oidc_config()
     
     def _load_oidc_config(self):
+        print("加载OIDC配置:", self.discovery_url)
         # 加载OIDC配置
         response = requests.get(self.discovery_url)
         if response.status_code == 200:
@@ -168,8 +169,10 @@ class OIDCService:
             account_id = str(account.id)
 
             if redirect_uri_params:
+                # web app 登录
                 payload = {
                     "user_id": account_id,  # 将UUID转换为字符串
+                    "end_user_id": account_id,
                     "session_id": account.email,
                     "auth_type": "internal",
                     "token_source": "webapp_login_token",

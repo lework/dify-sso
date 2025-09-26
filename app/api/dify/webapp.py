@@ -9,6 +9,59 @@ from app.extensions.ext_redis import redis_client
 from app.models.model import Site
 
 
+# @api.get("/info")
+# def get_enterprise_info():
+#     data = {
+#         "SSOEnforcedForSignin": True,
+#         "SSOEnforcedForSigninProtocol": "oidc",
+#         "EnableEmailCodeLogin": True,
+#         "EnableEmailPasswordLogin": True,
+#         "IsAllowRegister": True,
+#         "IsAllowCreateWorkspace": True,
+#         "Branding": {
+#             "applicationTitle": "",
+#             "loginPageLogo": "",
+#             "workspaceLogo": "",
+#             "favicon": "",
+#         },
+#         "WebAppAuth": {
+#             "allowSso": True,
+#             "allowEmailCodeLogin": True,
+#             "allowEmailPasswordLogin": True,
+#             "SSOEnforcedForWebProtocol": "oidc",
+#         },
+#         "License": {
+#             "status": "active",
+#             "workspaces": {
+#                 "enabled": True,
+#                 "used": 1,
+#                 "limit": 100
+#             },
+#             "expiredAt": "2099-12-31T23:59:59Z",
+#         },
+#         "PluginInstallationPermission": {
+#             "pluginInstallationScope": "all",
+#             "restrictToMarketplaceOnly": False
+#         }
+#     }
+#
+#     return data
+
+@api.get("/workspace/<string:tenant_id>/info")
+def get_workspace_info(tenant_id):
+    data = {
+        "enabled": True,
+        "used": 1,
+        "limit": 100
+    }
+    return {"WorkspaceMembers": data}
+
+@api.get("/sso/app/last-update-time")
+@api.get("/sso/workspace/last-update-time")
+def get_sso_app_last_update_time():
+    return "2025-01-01T00:00:00Z"
+
+
 @api.post("/webapp/access-mode")
 @api.post("/console/api/enterprise/webapp/app/access-mode")
 def set_app_access_mode():
@@ -58,6 +111,18 @@ def get_app_access_mode():
         else:
             return {"accessMode": "public"}
 
+@api.post("/webapp/access-mode/batch/id")
+def get_webapp_access_mode_code_batch():
+    appIds = request.json.get("appIds", [])
+    accessModes = {}
+    for app_id in appIds:
+        access_mode = redis_client.get(f"webapp_access_mode:{app_id}")
+        if access_mode:
+            accessModes[app_id] = access_mode.decode()
+        else:
+            accessModes[app_id] = "public"
+
+    return {"accessModes": accessModes}
 
 @api.get("/api/webapp/permission")
 @api.get("/console/api/enterprise/webapp/permission")
@@ -233,7 +298,6 @@ def get_webapp_access_mode_code():
     else:
        return {"accessMode": "public"}
 
-
 @api.get("/webapp/permission")
 def get_webapp_permission():
     app_code = request.args.get("appCode", "")
@@ -266,3 +330,51 @@ def get_webapp_permission():
                 return {"result": False}
         else:
             return {"result": False}
+
+@api.post("/webapp/permission/batch")
+def get_webapp_permission_batch():
+    appCodes = request.json.get("appCodes", [])
+    userId = request.json.get("userId", "")
+    permissions = {}
+
+    for app_code in appCodes:
+        permissions[app_code] = False
+        site = db.session.query(Site).filter(Site.code == app_code).first()
+        if site:
+            app_id = site.app_id
+        else:
+            continue
+
+        access_mode = "public"
+        access_mode_value = redis_client.get(f"webapp_access_mode:{app_id}")
+        if access_mode_value is not None:
+            access_mode = access_mode_value.decode()
+
+        if access_mode == "public":
+            permissions[app_code] = True
+            continue
+
+        if access_mode in ["private_all", "sso_verified"]:
+            permissions[app_code] = True
+            continue
+        else:
+            accounts_value = redis_client.get(f"webapp_access_mode:accounts:{app_id}")
+            if accounts_value:
+                accounts = accounts_value.decode().split(",")
+                if userId in accounts:
+                    permissions[app_code] = True
+                else:
+                    permissions[app_code] = False
+            else:
+                permissions[app_code] = False
+
+@api.delete("/webapp/clean")
+def clean_webapp_access_mode():
+    appId = request.args.get("appId", "")
+    if appId == "":
+        return {"result": False}
+    logger.info(f"clean_webapp_access_mode: {appId}")
+    redis_client.delete(f"webapp_access_mode:{appId}")
+    redis_client.delete(f"webapp_access_mode:groups:{appId}")
+    redis_client.delete(f"webapp_access_mode:accounts:{appId}")
+    return {"result": True}
