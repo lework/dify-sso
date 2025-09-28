@@ -15,6 +15,7 @@ def get_enterprise_info():
     data = {
         "SSOEnforcedForSignin": True,
         "SSOEnforcedForSigninProtocol": "oidc",
+        "SSOEnforcedForWebProtocol": "oidc",
         "EnableEmailCodeLogin": True,
         "EnableEmailPasswordLogin": True,
         "IsAllowRegister": True,
@@ -29,7 +30,6 @@ def get_enterprise_info():
             "allowSso": True,
             "allowEmailCodeLogin": True,
             "allowEmailPasswordLogin": True,
-            "SSOEnforcedForWebProtocol": "oidc",
         },
         "License": {
             "status": "active",

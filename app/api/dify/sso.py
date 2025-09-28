@@ -31,7 +31,7 @@ def oidc_callback():
 
     try:
         if app_code and redirect_url:
-            tokens = oidc_service.handle_callback(code, client_host, f"app_code={app_code}&redirect_url={redirect_url}")
+            tokens = oidc_service.handle_callback(code, client_host, f"app_code={app_code}&redirect_url={redirect_url}", app_code)
             return redirect(f"{config.CONSOLE_WEB_URL}/webapp-signin?web_sso_token={tokens['access_token']}&redirect_url={redirect_url}")
         else:
             tokens = oidc_service.handle_callback(code, client_host)

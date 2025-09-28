@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 from app.configs import config
 from app.models.account import Account, AccountStatus, TenantAccountJoin,TenantAccountRole
 from app.models.engine import db
+from app.models.model import Site
+from app.extensions.ext_redis import redis_client
 from app.services.passport import PassportService
 from app.services.token import TokenService
 
@@ -92,7 +94,7 @@ class OIDCService:
             raise Exception("Failed to get user info")
         return response.json()
 
-    def handle_callback(self, code: str, client_host: str, redirect_uri_params: str = "") -> Dict[str, str]:
+    def handle_callback(self, code: str, client_host: str, redirect_uri_params: str = "", app_code: str = "") -> Dict[str, str]:
         # 处理回调，返回access token和refresh token
         try:
             # 获取访问令牌
@@ -168,12 +170,25 @@ class OIDCService:
             account_id = str(account.id)
 
             if redirect_uri_params:
+                auth_type= "internal"
+                logger.debug("处理Web应用登录，app_code=%s", app_code)
+
+                site = db.session.query(Site).filter(Site.code == app_code).first()
+                if site:
+                    access_mode = redis_client.get(f"webapp_access_mode:{site.app_id}")
+                    if access_mode:
+                        if access_mode.decode() == "public":
+                            auth_type= "public"
+                        if access_mode.decode() == "sso_verified":
+                            auth_type= "external"
+                        logger.debug("Web应用登录类型: %s => %s", access_mode.decode(), auth_type)
+
                 # web app 登录
                 payload = {
                     "user_id": account_id,  # 将UUID转换为字符串
                     "end_user_id": account_id,
                     "session_id": account_id,
-                    "auth_type": "internal",
+                    "auth_type": auth_type,
                     "token_source": "webapp_login_token",
                     "exp": exp,
                     "sub": "Web API Passport",
