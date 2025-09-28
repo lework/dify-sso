@@ -27,4 +27,4 @@ RUN --mount=type=cache,id=pip,target=/root/.cache \
 # 拷贝代码
 COPY . .
 
-CMD ["bash", "-c", "exec gunicorn -w ${GUNICORN_WORKERS} -b 0.0.0.0:8000 app.main:app"]
+CMD ["sh", "-c", "exec gunicorn -w ${GUNICORN_WORKERS} -b 0.0.0.0:8000 app.main:app"]

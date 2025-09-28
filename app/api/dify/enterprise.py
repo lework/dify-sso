@@ -1,6 +1,8 @@
 from flask import request
 from datetime import datetime, timedelta
 
+from gunicorn.glogging import loggers
+
 from app.api.router import api
 
 # 模拟企业信息
@@ -151,9 +153,9 @@ FEATURES = {
 }
 
 
-@api.get("/info")
-def get_enterprise_info():
-    return MOCK_ENTERPRISE_INFO
+# @api.get("/info")
+# def get_enterprise_info():
+#     return MOCK_ENTERPRISE_INFO
 
 @api.get("/app-sso-setting")
 def get_app_sso_setting():

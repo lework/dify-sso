@@ -1,5 +1,5 @@
 import math
-from flask import request
+from flask import request, jsonify
 
 from app.api.router import api, logger
 from app.services.passport import PassportService
@@ -9,46 +9,48 @@ from app.extensions.ext_redis import redis_client
 from app.models.model import Site
 
 
-# @api.get("/info")
-# def get_enterprise_info():
-#     data = {
-#         "SSOEnforcedForSignin": True,
-#         "SSOEnforcedForSigninProtocol": "oidc",
-#         "EnableEmailCodeLogin": True,
-#         "EnableEmailPasswordLogin": True,
-#         "IsAllowRegister": True,
-#         "IsAllowCreateWorkspace": True,
-#         "Branding": {
-#             "applicationTitle": "",
-#             "loginPageLogo": "",
-#             "workspaceLogo": "",
-#             "favicon": "",
-#         },
-#         "WebAppAuth": {
-#             "allowSso": True,
-#             "allowEmailCodeLogin": True,
-#             "allowEmailPasswordLogin": True,
-#             "SSOEnforcedForWebProtocol": "oidc",
-#         },
-#         "License": {
-#             "status": "active",
-#             "workspaces": {
-#                 "enabled": True,
-#                 "used": 1,
-#                 "limit": 100
-#             },
-#             "expiredAt": "2099-12-31T23:59:59Z",
-#         },
-#         "PluginInstallationPermission": {
-#             "pluginInstallationScope": "all",
-#             "restrictToMarketplaceOnly": False
-#         }
-#     }
-#
-#     return data
+@api.get("/info")
+def get_enterprise_info():
+    logger.info("get_enterprise_info called")
+    data = {
+        "SSOEnforcedForSignin": True,
+        "SSOEnforcedForSigninProtocol": "oidc",
+        "EnableEmailCodeLogin": True,
+        "EnableEmailPasswordLogin": True,
+        "IsAllowRegister": True,
+        "IsAllowCreateWorkspace": True,
+        "Branding": {
+            "applicationTitle": "",
+            "loginPageLogo": "",
+            "workspaceLogo": "",
+            "favicon": "",
+        },
+        "WebAppAuth": {
+            "allowSso": True,
+            "allowEmailCodeLogin": True,
+            "allowEmailPasswordLogin": True,
+            "SSOEnforcedForWebProtocol": "oidc",
+        },
+        "License": {
+            "status": "active",
+            "workspaces": {
+                "enabled": True,
+                "used": 1,
+                "limit": 100
+            },
+            "expiredAt": "2099-12-31T23:59:59Z",
+        },
+        "PluginInstallationPermission": {
+            "pluginInstallationScope": "all",
+            "restrictToMarketplaceOnly": False
+        }
+    }
+
+    return data
 
 @api.get("/workspace/<string:tenant_id>/info")
 def get_workspace_info(tenant_id):
+    logger.info(f"get_workspace_info called with tenant_id: {tenant_id}")
     data = {
         "enabled": True,
         "used": 1,
@@ -59,7 +61,7 @@ def get_workspace_info(tenant_id):
 @api.get("/sso/app/last-update-time")
 @api.get("/sso/workspace/last-update-time")
 def get_sso_app_last_update_time():
-    return "2025-01-01T00:00:00Z"
+    return jsonify("2025-01-01T00:00:00+00:00")
 
 
 @api.post("/webapp/access-mode")
@@ -69,6 +71,7 @@ def set_app_access_mode():
     appId = request.json.get("appId", "")
     access_mode = request.json.get("accessMode", "")
     subjects = request.json.get("subjects", [])
+    logger.info(f"set_app_access_mode called with appId: {appId}, accessMode: {access_mode}, subjects: {subjects}")
 
     if appId == "":
         return {"accessMode": "public", "result": False}
@@ -96,25 +99,30 @@ def set_app_access_mode():
 def get_app_access_mode():
     app_id = request.args.get("appId", "")
     app_code = request.args.get("appCode", "")
+    logger.info(f"get_app_access_mode: app_id={app_id}, app_code={app_code}")
+
     if app_code != "":
         site = db.session.query(Site).filter(Site.code == app_code).first()
-        logger.info(f"site: {site}")
         if site:
             app_id = site.app_id
     if app_id == "":
+        logger.info(f"app_id is empty, return public")
         return {"accessMode": "public"}
     else:
         access_mode = redis_client.get(f"webapp_access_mode:{app_id}")
         if access_mode:
-            logger.info(f"access_mode: {access_mode.decode()}")
+            logger.info(f"app_id:{app_id}, access_mode: {access_mode.decode()}")
             return {"accessMode": access_mode.decode()}
         else:
+            logger.info(f"app_id:{app_id}, access_mode not set, return public")
             return {"accessMode": "public"}
 
 @api.post("/webapp/access-mode/batch/id")
 def get_webapp_access_mode_code_batch():
     appIds = request.json.get("appIds", [])
     accessModes = {}
+    logger.info(f"get_webapp_access_mode_code_batch: appIds={appIds}")
+
     for app_id in appIds:
         access_mode = redis_client.get(f"webapp_access_mode:{app_id}")
         if access_mode:
@@ -130,13 +138,14 @@ def get_app_permission():
     user_id = "visitor"
     app_id = request.args.get("appId", "")
     app_code = request.args.get("appCode", "")
+    logger.info(f"get_app_permission: app_id={app_id}, app_code={app_code}")
 
     if app_code != "":
         site = db.session.query(Site).filter(Site.code == app_code).first()
-        logger.info(f"site: {site}")
         if site:
             app_id = site.app_id
         else:
+            logger.info(f"app_code {app_code} not found")
             return {"result": False}
 
     try:
@@ -152,6 +161,7 @@ def get_app_permission():
             raise
 
         decoded = PassportService().verify(tk)
+        logger.info(f"app_id {app_id} decoded token: {decoded}")
         user_id = decoded.get("end_user_id", decoded.get("user_id", "visitor"))
     except Exception as e:
         logger.error(f"get_app_permission error: {e}")
@@ -163,24 +173,31 @@ def get_app_permission():
         access_mode = access_mode_value.decode()
 
     if access_mode == "public":
+        logger.info(f"app_id {app_id} is public, access granted")
         return {"result": True}
 
     if access_mode in ["private_all", "sso_verified"] and user_id != "visitor":
+        logger.info(f"app_id {app_id} is private_all or sso_verified, user_id {user_id} is not visitor, access granted")
         return {"result": True}
     else:
         accounts_value = redis_client.get(f"webapp_access_mode:accounts:{app_id}")
         if accounts_value:
             accounts = accounts_value.decode().split(",")
             if user_id in accounts:
+                logger.info(f"app_id {app_id} has accounts set, user_id {user_id} is in accounts, access granted")
                 return {"result": True}
             else:
+                logger.info(f"app_id {app_id} has accounts set, user_id {user_id} is not in accounts, access denied")
                 return {"result": False}
         else:
+            logger.info(f"app_id {app_id} has no accounts set, access denied")
             return {"result": False}
 
 @api.get("/console/api/enterprise/webapp/app/subjects")
 def get_app_subjects():
     app_id = request.args.get("appId", "")
+    logger.info(f"get_app_subjects: app_id={app_id}")
+
     if app_id == "":
         return {"groups": [], "members": []}
 
@@ -211,6 +228,7 @@ def search_app_subjects():
         page = max(1, int(request.args.get("pageNumber", 1)))
         page_size = min(100, max(1, int(request.args.get("resultsPerPage", 10))))  # 限制页面大小
         keyword = request.args.get("keyword", "").strip()
+        logger.info(f"search_app_subjects: page={page}, page_size={page_size}, keyword={keyword}")
         
         # 构建基础查询条件
         base_query = db.session.query(Account).filter(Account.status == AccountStatus.ACTIVE)
@@ -284,30 +302,42 @@ def search_app_subjects():
 
 @api.get("/webapp/access-mode/code")
 def get_webapp_access_mode_code():
+    logger.info("get_webapp_access_mode_code called", request.args)
     app_code = request.args.get("app_code", "")
     if app_code == "":
+        app_code = request.args.get("appCode", "")
+
+    logger.info(f"get_webapp_access_mode_code: app_code={app_code}")
+
+    if app_code == "":
+        logger.info(f"app_code is empty, return public")
         return {"accessMode": "public"}
 
     site = db.session.query(Site).filter(Site.code == app_code).first()
     if site:
          access_mode_value = redis_client.get(f"webapp_access_mode:{site.app_id}")
          if access_mode_value:
+            logger.info(f"app_code:{app_code}, access_mode: {access_mode_value.decode()}")
             return {"accessMode": access_mode_value.decode()}
          else:
+            logger.info(f"app_code:{app_code}, access_mode not set, return public")
             return {"accessMode": "public"}
     else:
+       logger.info(f"app_code {app_code} not found, return public")
        return {"accessMode": "public"}
 
 @api.get("/webapp/permission")
 def get_webapp_permission():
     app_code = request.args.get("appCode", "")
     user_id = request.args.get("userId", "")
+    logger.info(f"get_webapp_permission: app_code={app_code}, user_id={user_id}")
 
     if app_code != "":
         site = db.session.query(Site).filter(Site.code == app_code).first()
         if site:
             app_id = site.app_id
         else:
+            logger.info(f"app_code {app_code} not found")
             return {"result": False}
 
     access_mode = "public"
@@ -316,19 +346,24 @@ def get_webapp_permission():
         access_mode = access_mode_value.decode()
 
     if access_mode == "public":
+        logger.info(f"app_id {app_id} is public, access granted")
         return {"result": True}
 
     if access_mode in ["private_all", "sso_verified"]:
+        logger.info(f"app_id {app_id} is private_all or sso_verified, access granted")
         return {"result": True}
     else:
         accounts_value = redis_client.get(f"webapp_access_mode:accounts:{app_id}")
         if accounts_value:
             accounts = accounts_value.decode().split(",")
             if user_id in accounts:
+                logger.info(f"app_id {app_id} has accounts set, user_id {user_id} is in accounts, access granted")
                 return {"result": True}
             else:
+                logger.info(f"app_id {app_id} has accounts set, user_id {user_id} is not in accounts, access denied")
                 return {"result": False}
         else:
+            logger.info(f"app_id {app_id} has no accounts set, access denied")
             return {"result": False}
 
 @api.post("/webapp/permission/batch")
@@ -336,6 +371,7 @@ def get_webapp_permission_batch():
     appCodes = request.json.get("appCodes", [])
     userId = request.json.get("userId", "")
     permissions = {}
+    logger.info(f"get_webapp_permission_batch: appCodes={appCodes}, userId={userId}")
 
     for app_code in appCodes:
         permissions[app_code] = False
@@ -368,13 +404,28 @@ def get_webapp_permission_batch():
             else:
                 permissions[app_code] = False
 
+    return {"permissions": permissions}
+
 @api.delete("/webapp/clean")
 def clean_webapp_access_mode():
     appId = request.args.get("appId", "")
+    logger.info(f"clean_webapp_access_mode called with appId: {appId}")
+
     if appId == "":
         return {"result": False}
     logger.info(f"clean_webapp_access_mode: {appId}")
     redis_client.delete(f"webapp_access_mode:{appId}")
     redis_client.delete(f"webapp_access_mode:groups:{appId}")
     redis_client.delete(f"webapp_access_mode:accounts:{appId}")
+
+    return {"result": True}
+
+# PluginManagerService
+@api.post("/check-credential-policy-compliance")
+def check_credential_policy_compliance():
+    # 示例请求体
+    # {'dify_credential_id': '0198eabb-3b2c-793e-a491-3ddf5bfc75a6', 'provider': 'langgenius/tongyi/tongyi', 'credential_type': 0}
+    data = request.json
+    logger.info(f"check_credential_policy_compliance called with data: {data}")
+
     return {"result": True}
