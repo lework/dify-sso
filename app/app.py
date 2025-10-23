@@ -1,5 +1,6 @@
-import time
 import logging
+import time
+
 from flask import Flask
 
 from app.configs import config
@@ -20,8 +21,9 @@ def create_app(name: str) -> Flask:
 
     # 启动前检查
     check_app_config(app)
-    
+
     return app
+
 
 def check_app_config(app: Flask):
     if not oidc_service.check_oidc_config():
@@ -29,7 +31,6 @@ def check_app_config(app: Flask):
 
 
 def initialize_extensions(app: Flask):
-  
     from app.extensions import ext_database, ext_redis, ext_logging, ext_timezone, ext_blueprints, ext_oidc
 
     extensions = [ext_database, ext_redis, ext_logging, ext_timezone, ext_blueprints, ext_oidc]

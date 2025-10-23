@@ -1,7 +1,6 @@
-from flask import request
 from datetime import datetime, timedelta
 
-from gunicorn.glogging import loggers
+from flask import request
 
 from app.api.router import api
 
@@ -157,6 +156,7 @@ FEATURES = {
 # def get_enterprise_info():
 #     return MOCK_ENTERPRISE_INFO
 
+
 @api.get("/app-sso-setting")
 def get_app_sso_setting():
     app_code = request.args.get("app_code", "")
@@ -165,7 +165,8 @@ def get_app_sso_setting():
         "enabled": True,
         "protocol": "oidc",
         "app_code": app_code
-    } 
+    }
+
 
 # 计费相关接口
 @api.get("/subscription/info")
@@ -177,6 +178,7 @@ def get_billing_info():
 @api.get("/console/api/system-features")
 def get_system_features():
     return SYSTEM_FEATURES
+
 
 @api.get("/console/api/features")
 def get_features():

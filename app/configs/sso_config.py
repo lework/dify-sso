@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings
 
 
 class SSOConfig(BaseSettings):
-
     OIDC_CLIENT_ID: str = Field(
         description="Client ID for the OpenID Connect provider",
         default="",
@@ -33,4 +32,3 @@ class SSOConfig(BaseSettings):
         description="Response type for the OpenID Connect provider",
         default="code",
     )
-    

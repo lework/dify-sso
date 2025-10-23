@@ -2,12 +2,12 @@ import logging
 import os
 import sys
 import uuid
-import flask
-from flask import Flask
 from logging.handlers import RotatingFileHandler
 
-from app.configs import config
+import flask
+from flask import Flask
 
+from app.configs import config
 
 
 def init_app(app: Flask):

@@ -2,9 +2,9 @@ import functools
 import logging
 from collections.abc import Callable
 from typing import Any, Union
-from flask import Flask
 
 import redis
+from flask import Flask
 from redis import RedisError
 from redis.cache import CacheConfig
 from redis.cluster import ClusterNode, RedisCluster

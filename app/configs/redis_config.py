@@ -1,4 +1,5 @@
 from typing import Optional
+
 from pydantic import Field, NonNegativeInt, PositiveFloat, PositiveInt
 from pydantic_settings import BaseSettings
 

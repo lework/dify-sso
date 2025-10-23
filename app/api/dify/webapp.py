@@ -1,12 +1,13 @@
 import math
+
 from flask import request, jsonify
 
 from app.api.router import api, logger
-from app.services.passport import PassportService
-from app.models.account import Account,AccountStatus
-from app.models.engine import db
 from app.extensions.ext_redis import redis_client
+from app.models.account import Account, AccountStatus
+from app.models.engine import db
 from app.models.model import Site
+from app.services.passport import PassportService
 
 
 @api.get("/info")
@@ -48,6 +49,7 @@ def get_enterprise_info():
 
     return data
 
+
 @api.get("/workspace/<string:tenant_id>/info")
 def get_workspace_info(tenant_id):
     logger.info(f"get_workspace_info called with tenant_id: {tenant_id}")
@@ -58,6 +60,7 @@ def get_workspace_info(tenant_id):
     }
     return {"WorkspaceMembers": data}
 
+
 @api.get("/sso/app/last-update-time")
 @api.get("/sso/workspace/last-update-time")
 def get_sso_app_last_update_time():
@@ -67,7 +70,6 @@ def get_sso_app_last_update_time():
 @api.post("/webapp/access-mode")
 @api.post("/console/api/enterprise/webapp/app/access-mode")
 def set_app_access_mode():
-
     appId = request.json.get("appId", "")
     access_mode = request.json.get("accessMode", "")
     subjects = request.json.get("subjects", [])
@@ -117,6 +119,7 @@ def get_app_access_mode():
             logger.info(f"app_id:{app_id}, access_mode not set, return public")
             return {"accessMode": "public"}
 
+
 @api.post("/webapp/access-mode/batch/id")
 def get_webapp_access_mode_code_batch():
     appIds = request.json.get("appIds", [])
@@ -131,6 +134,7 @@ def get_webapp_access_mode_code_batch():
             accessModes[app_id] = "public"
 
     return {"accessModes": accessModes}
+
 
 @api.get("/api/webapp/permission")
 @api.get("/console/api/enterprise/webapp/permission")
@@ -193,6 +197,7 @@ def get_app_permission():
             logger.info(f"app_id {app_id} has no accounts set, access denied")
             return {"result": False}
 
+
 @api.get("/console/api/enterprise/webapp/app/subjects")
 def get_app_subjects():
     app_id = request.args.get("appId", "")
@@ -229,10 +234,10 @@ def search_app_subjects():
         page_size = min(100, max(1, int(request.args.get("resultsPerPage", 10))))  # 限制页面大小
         keyword = request.args.get("keyword", "").strip()
         logger.info(f"search_app_subjects: page={page}, page_size={page_size}, keyword={keyword}")
-        
+
         # 构建基础查询条件
         base_query = db.session.query(Account).filter(Account.status == AccountStatus.ACTIVE)
-        
+
         # 添加搜索条件 - 支持姓名和邮箱搜索
         if keyword:
             search_filter = db.or_(
@@ -240,13 +245,13 @@ def search_app_subjects():
                 Account.email.ilike(f"%{keyword}%")
             )
             base_query = base_query.filter(search_filter)
-        
+
         # 计算总数和分页数据（使用窗口函数优化）
         paginated_query = base_query.order_by(Account.name, Account.id)  # 确保排序稳定性
-        
+
         # 获取总数
         total_count = base_query.count()
-        
+
         if total_count == 0:
             return {
                 "currPage": page,
@@ -254,11 +259,11 @@ def search_app_subjects():
                 "subjects": [],
                 "hasMore": False,
             }
-        
+
         # 分页查询
         offset = (page - 1) * page_size
         users = paginated_query.limit(page_size).offset(offset).all()
-        
+
         # 构建响应数据
         subjects = [
             {
@@ -274,18 +279,18 @@ def search_app_subjects():
             }
             for user in users
         ]
-        
+
         # 计算分页信息
         total_pages = math.ceil(total_count / page_size)
         has_more = page < total_pages
-        
+
         return {
             "currPage": page,
             "totalPages": total_pages,
             "subjects": subjects,
             "hasMore": has_more,
         }
-        
+
     except ValueError as e:
         # 参数类型错误
         return {
@@ -315,16 +320,17 @@ def get_webapp_access_mode_code():
 
     site = db.session.query(Site).filter(Site.code == app_code).first()
     if site:
-         access_mode_value = redis_client.get(f"webapp_access_mode:{site.app_id}")
-         if access_mode_value:
+        access_mode_value = redis_client.get(f"webapp_access_mode:{site.app_id}")
+        if access_mode_value:
             logger.info(f"app_code:{app_code}, access_mode: {access_mode_value.decode()}")
             return {"accessMode": access_mode_value.decode()}
-         else:
+        else:
             logger.info(f"app_code:{app_code}, access_mode not set, return public")
             return {"accessMode": "public"}
     else:
-       logger.info(f"app_code {app_code} not found, return public")
-       return {"accessMode": "public"}
+        logger.info(f"app_code {app_code} not found, return public")
+        return {"accessMode": "public"}
+
 
 @api.get("/webapp/permission")
 def get_webapp_permission():
@@ -366,6 +372,7 @@ def get_webapp_permission():
             logger.info(f"app_id {app_id} has no accounts set, access denied")
             return {"result": False}
 
+
 @api.post("/webapp/permission/batch")
 def get_webapp_permission_batch():
     appCodes = request.json.get("appCodes", [])
@@ -406,6 +413,7 @@ def get_webapp_permission_batch():
 
     return {"permissions": permissions}
 
+
 @api.delete("/webapp/clean")
 def clean_webapp_access_mode():
     appId = request.args.get("appId", "")
@@ -419,6 +427,7 @@ def clean_webapp_access_mode():
     redis_client.delete(f"webapp_access_mode:accounts:{appId}")
 
     return {"result": True}
+
 
 # PluginManagerService
 @api.post("/check-credential-policy-compliance")

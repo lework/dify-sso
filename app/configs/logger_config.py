@@ -1,6 +1,8 @@
 from typing import Optional
+
 from pydantic import Field, PositiveInt
 from pydantic_settings import BaseSettings
+
 
 class LoggingConfig(BaseSettings):
     """

@@ -1,18 +1,21 @@
 import logging
-import requests
+from datetime import timedelta
 from typing import Dict
-from urllib.parse import urlencode,unquote
-from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode, unquote
+
+import requests
 
 from app.configs import config
-from app.models.account import Account, AccountStatus, TenantAccountJoin,TenantAccountRole
-from app.models.engine import db
-from app.models.model import Site
+from app.extensions.ext_database import db
 from app.extensions.ext_redis import redis_client
+from app.libs.helper import naive_utc_now
+from app.models.account import Account, AccountStatus, TenantAccountJoin, TenantAccountRole
+from app.models.model import Site
 from app.services.passport import PassportService
 from app.services.token import TokenService
 
 logger = logging.getLogger(__name__)
+
 
 class OIDCService:
     def __init__(self):
@@ -26,12 +29,12 @@ class OIDCService:
         self.account_default_role = config.ACCOUNT_DEFAULT_ROLE
         self.passport_service = PassportService()
         self.token_service = TokenService()
-        
+
         # 获取OIDC配置
         self._load_oidc_config()
-    
+
     def _load_oidc_config(self):
-        # 加载OIDC配置
+        """加载OIDC配置"""
         response = requests.get(self.discovery_url)
         if response.status_code == 200:
             oidc_config = response.json()
@@ -44,6 +47,7 @@ class OIDCService:
             raise Exception("Failed to load OIDC configuration")
 
     def check_oidc_config(self) -> bool:
+        """checks if the OIDC configuration is complete"""
         if not self.authorization_endpoint or not self.token_endpoint or not self.userinfo_endpoint:
             return False
         return True
@@ -79,8 +83,8 @@ class OIDCService:
 
         response = requests.post(self.token_endpoint, data=data)
         if response.status_code != 200:
-            logger.exception("获取token失败: status_code=%d, response=%s", 
-                           response.status_code, response.text)
+            logger.exception("获取token失败: status_code=%d, response=%s",
+                             response.status_code, response.text)
             raise Exception("Failed to get token")
         return response.json()
 
@@ -89,35 +93,36 @@ class OIDCService:
         headers = {'Authorization': f'Bearer {access_token}'}
         response = requests.get(self.userinfo_endpoint, headers=headers)
         if response.status_code != 200:
-            logger.exception("获取用户信息失败: status_code=%d, response=%s", 
-                           response.status_code, response.text)
+            logger.exception("获取用户信息失败: status_code=%d, response=%s",
+                             response.status_code, response.text)
             raise Exception("Failed to get user info")
         return response.json()
 
-    def handle_callback(self, code: str, client_host: str, redirect_uri_params: str = "", app_code: str = "") -> Dict[str, str]:
-        # 处理回调，返回access token和refresh token
+    def bind_account(self, code: str, client_host: str, redirect_uri_params: str = "") -> Account:
+        """binds a user to the system"""
         try:
             # 获取访问令牌
             token_response = self.get_token(code, redirect_uri_params)
             access_token = token_response.get('access_token')
-            
+
             # 获取用户信息
             user_info = self.get_user_info(access_token)
             user_name = user_info.get('name')
             user_email = user_info.get('email')
             user_roles = user_info.get('roles', [])
             logger.debug("用户信息: %s", user_info)
-            
+
             # 验证必填字段
-            if not user_email:  
-                logger.error("用户邮箱信息缺失: %s",  user_info)
-                raise Exception("用户邮箱信息缺失")
-            
+            if not user_email:
+                logger.error("用户邮箱信息缺失: %s", user_info)
+                raise Exception("User email is required")
+
             if not user_name:
                 user_name = user_email.split('@')[0]  # 使用邮箱前缀作为默认用户名
-            
+
             # 确定用户角色（按优先级从高到低判断）
-            user_role = TenantAccountRole(self.account_default_role) if TenantAccountRole.is_valid_role(self.account_default_role) else TenantAccountRole.NORMAL
+            user_role = TenantAccountRole(self.account_default_role) if TenantAccountRole.is_valid_role(
+                self.account_default_role) else TenantAccountRole.NORMAL
             if TenantAccountRole.ADMIN in user_roles:
                 user_role = TenantAccountRole.ADMIN
             elif TenantAccountRole.EDITOR in user_roles:
@@ -153,24 +158,34 @@ class OIDCService:
                         db.session.add(tenant_account_join)
 
             # 更新用户登录信息
-            account.last_login_at = datetime.now(UTC)
+            account.last_login_at = naive_utc_now()
             account.last_login_ip = client_host
             if account.status != AccountStatus.ACTIVE:
                 account.status = AccountStatus.ACTIVE
             if account.name != user_name:
                 account.name = user_name
-            
+
             db.session.add(account)
             db.session.commit()
             logger.info("用户验证成功: %s, 角色: %s", user_email, user_role)
+            return account
+        except Exception as e:
+            logger.exception("处理用户信息验证时发生错误: %s", str(e))
+            raise
 
+    def handle_callback(self, code: str, client_host: str, redirect_uri_params: str = "", app_code: str = "") -> Dict[
+        str, str]:
+        # 处理回调，返回access token和refresh token
+        try:
+            account = self.bind_account(code, client_host, redirect_uri_params)
+            
             # 生成JWT token
-            exp_dt = datetime.now(UTC) + timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES)
+            exp_dt = naive_utc_now() + timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES)
             exp = int(exp_dt.timestamp())
             account_id = str(account.id)
 
             if redirect_uri_params:
-                auth_type= "internal"
+                auth_type = "internal"
                 logger.debug("处理Web应用登录，app_code=%s", app_code)
 
                 site = db.session.query(Site).filter(Site.code == app_code).first()
@@ -178,16 +193,16 @@ class OIDCService:
                     access_mode = redis_client.get(f"webapp_access_mode:{site.app_id}")
                     if access_mode:
                         if access_mode.decode() == "public":
-                            auth_type= "public"
+                            auth_type = "public"
                         if access_mode.decode() == "sso_verified":
-                            auth_type= "external"
+                            auth_type = "external"
                         logger.debug("Web应用登录类型: %s => %s", access_mode.decode(), auth_type)
 
                 # web app 登录
                 payload = {
                     "user_id": account_id,  # 将UUID转换为字符串
                     "end_user_id": account_id,
-                    "session_id": account_id,
+                    "session_id": account.email,
                     "auth_type": auth_type,
                     "token_source": "webapp_login_token",
                     "exp": exp,
@@ -201,25 +216,25 @@ class OIDCService:
                 }
 
             else:
-              payload = {
-                  "user_id": account_id,  # 将UUID转换为字符串
-                  "exp": exp,
-                  "iss": config.EDITION,
-                  "sub": "Console API Passport",
-              }
+                payload = {
+                    "user_id": account_id,  # 将UUID转换为字符串
+                    "exp": exp,
+                    "iss": config.EDITION,
+                    "sub": "Console API Passport",
+                }
 
-              # 生成access token
-              console_access_token: str = self.passport_service.issue(payload)
+                # 生成access token
+                console_access_token: str = self.passport_service.issue(payload)
 
-              # 生成并存储refresh token
-              refresh_token = self.token_service.generate_refresh_token()
-              self.token_service.store_refresh_token(refresh_token, account_id)
+                # 生成并存储refresh token
+                refresh_token = self.token_service.generate_refresh_token()
+                self.token_service.store_refresh_token(refresh_token, account_id)
 
-              return {
-                  "access_token": console_access_token,
-                  "refresh_token": refresh_token,
-              }
-        
+                return {
+                    "access_token": console_access_token,
+                    "refresh_token": refresh_token,
+                }
+
         except Exception as e:
             logger.exception("处理OIDC回调时发生错误: %s", str(e))
             raise

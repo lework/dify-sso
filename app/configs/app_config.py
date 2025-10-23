@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings
 
 
 class AppConfig(BaseSettings):
-
     DEBUG: bool = Field(
         description="Enable debug mode for the application",
         default=False,
@@ -16,8 +15,8 @@ class AppConfig(BaseSettings):
 
     SECRET_KEY: str = Field(
         description="Secret key for secure session cookie signing."
-        "Make sure you are changing this key for your deployment with a strong key."
-        "Generate a strong key using `openssl rand -base64 42` or set via the `SECRET_KEY` environment variable.",
+                    "Make sure you are changing this key for your deployment with a strong key."
+                    "Generate a strong key using `openssl rand -base64 42` or set via the `SECRET_KEY` environment variable.",
         default="",
     )
 
@@ -55,4 +54,3 @@ class AppConfig(BaseSettings):
         description="Prefix for account refresh tokens",
         default="account_refresh_token:",
     )
-    

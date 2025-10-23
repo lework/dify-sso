@@ -3,10 +3,8 @@ from flask import Flask
 
 def init_app(app: Flask):
     # register blueprint routers
-
     from flask_cors import CORS
     from app.api.router import api
-
 
     CORS(
         app,

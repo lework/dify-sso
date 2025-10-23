@@ -1,7 +1,8 @@
 import enum
 import json
-from typing import Optional
 from datetime import UTC, datetime
+from typing import Optional
+
 from flask_login import UserMixin
 from sqlalchemy import DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -242,7 +243,7 @@ class Tenant(db.Model):
         self.custom_config = json.dumps(value)
 
 
-class TenantAccountJoin(db.Model): 
+class TenantAccountJoin(db.Model):
     __tablename__ = "tenant_account_joins"
     __table_args__ = (
         db.PrimaryKeyConstraint("id", name="tenant_account_join_pkey"),
@@ -275,6 +276,7 @@ class TenantAccountJoin(db.Model):
     def get_by_account(cls, tenant_id: str, account_id: str):
         """通过账号查找用户"""
         return db.session.query(cls).filter(cls.tenant_id == tenant_id, cls.account_id == account_id).first()
+
 
 class AccountIntegrate(Base):
     __tablename__ = "account_integrates"

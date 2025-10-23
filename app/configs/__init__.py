@@ -2,9 +2,10 @@ from pydantic_settings import SettingsConfigDict
 
 from .app_config import AppConfig
 from .database_config import DatabaseConfig
-from .redis_config import RedisConfig
 from .logger_config import LoggingConfig
+from .redis_config import RedisConfig
 from .sso_config import SSOConfig
+
 
 class Config(
     AppConfig,
@@ -20,5 +21,6 @@ class Config(
         # ignore extra attributes
         extra="ignore",
     )
+
 
 config = Config()
