@@ -56,3 +56,7 @@ def not_found_error(error):
 @api.errorhandler(500)
 def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
+
+
+# 导入endpoints
+from .dify import sso, enterprise, webapp  # noqa: F401
