@@ -14,7 +14,7 @@ RUN \
     && echo "${TZ}" > /etc/timezone \
     && apk add --no-cache --virtual .build-deps gcc python3-dev musl-dev postgresql-dev \
     && pip install --upgrade pip \
-    && pip install --no-cache-dirpsycopg2-binary \
+    && pip install --no-cache-dir psycopg2-binary \
     && apk del --no-cache .build-deps
 
 WORKDIR /app
