@@ -43,7 +43,7 @@ def get_enterprise_info():
         },
         "PluginInstallationPermission": {
             "pluginInstallationScope": "all",
-            "restrictToMarketplaceOnly": False
+            "restrictToMarketplaceOnly": True
         }
     }
 
@@ -336,6 +336,7 @@ def get_webapp_access_mode_code():
 def get_webapp_permission():
     app_code = request.args.get("appCode", "")
     user_id = request.args.get("userId", "")
+    app_id = request.args.get("appId", "")
     logger.info(f"get_webapp_permission: app_code={app_code}, user_id={user_id}")
 
     if app_code != "":

@@ -178,7 +178,7 @@ class OIDCService:
         # 处理回调，返回access token和refresh token
         try:
             account = self.bind_account(code, client_host, redirect_uri_params)
-            
+
             # 生成JWT token
             exp_dt = naive_utc_now() + timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES)
             exp = int(exp_dt.timestamp())
