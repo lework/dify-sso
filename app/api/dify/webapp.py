@@ -50,17 +50,6 @@ def get_enterprise_info():
     return data
 
 
-@api.get("/workspace/<string:tenant_id>/info")
-def get_workspace_info(tenant_id):
-    logger.info(f"get_workspace_info called with tenant_id: {tenant_id}")
-    data = {
-        "enabled": True,
-        "used": 1,
-        "limit": 100
-    }
-    return {"WorkspaceMembers": data}
-
-
 @api.get("/sso/app/last-update-time")
 @api.get("/sso/workspace/last-update-time")
 def get_sso_app_last_update_time():
