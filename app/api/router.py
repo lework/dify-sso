@@ -59,4 +59,4 @@ def internal_error(error):
 
 
 # 导入endpoints
-from .dify import sso, enterprise, webapp  # noqa: F401
+from .dify import sso, enterprise, webapp, workspace  # noqa: F401
